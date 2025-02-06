@@ -4,11 +4,10 @@ const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
 const imageUpload = document.getElementById('image-upload');
 const opacitySlider = document.getElementById('opacity-slider');
-const scaleSlider = document.getElementById('scale-slider');
 
 let uploadedImage = null;
 let currentStream = null;
-let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0, imgSkewX = 0, imgSkewY = 0;
+let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0;
 let lastDist = 0, lastAngle = 0, lastTouchX = 0, lastTouchY = 0;
 
 // Function to get camera stream
@@ -52,12 +51,6 @@ imageUpload.addEventListener('change', (event) => {
 // Handle opacity change
 opacitySlider.addEventListener('input', drawOverlay);
 
-// Handle scale change
-scaleSlider.addEventListener('input', (event) => {
-  imgScale = parseFloat(event.target.value);
-  drawOverlay();
-});
-
 // Draw the overlay
 function drawOverlay() {
   const opacity = parseFloat(opacitySlider.value);
@@ -68,11 +61,10 @@ function drawOverlay() {
     ctx.globalAlpha = opacity;
     ctx.save();
     
-    // Apply transformations (scale, rotate, skew)
+    // Apply transformations (scale, rotate)
     ctx.translate(imgX, imgY);
     ctx.rotate(imgRotation);
     ctx.scale(imgScale, imgScale);
-    ctx.transform(1, imgSkewY, imgSkewX, 1, 0, 0);  // Apply skew
     
     ctx.drawImage(uploadedImage, -uploadedImage.width / 2, -uploadedImage.height / 2);
     ctx.restore();
@@ -87,7 +79,7 @@ function resizeCanvas() {
   drawOverlay();
 }
 
-// Handle touch gestures (for now just scaling)
+// Handle touch gestures (for now just scaling and rotating)
 canvas.addEventListener("touchstart", (event) => {
   if (event.touches.length === 2) {
     event.preventDefault();
