@@ -4,17 +4,50 @@ const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
 const imageUpload = document.getElementById('image-upload');
 const opacitySlider = document.getElementById('opacity-slider');
+const switchCameraButton = document.getElementById('switch-camera');
 
 let uploadedImage = null;
+let currentStream = null;
+let usingFrontCamera = true;
 
-// Access the camera
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then((stream) => {
-    video.srcObject = stream;
-  })
-  .catch((err) => {
-    console.error('Error accessing the camera: ', err);
-  });
+// Detect mobile devices
+function isMobile() {
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+// Show switch camera button only on mobile devices
+if (isMobile()) {
+  switchCameraButton.style.display = 'block';
+}
+
+// Function to get camera stream
+function getCameraStream(facingMode) {
+  const constraints = {
+    video: { facingMode: facingMode }
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
+    .then((stream) => {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop()); // Stop the previous stream
+      }
+      currentStream = stream;
+      video.srcObject = stream;
+    })
+    .catch((err) => {
+      console.error('Error accessing the camera: ', err);
+    });
+}
+
+// Initialize with front camera
+getCameraStream('user'); // 'user' is the front camera
+
+// Switch cameras
+switchCameraButton.addEventListener('click', () => {
+  usingFrontCamera = !usingFrontCamera;
+  const facingMode = usingFrontCamera ? 'user' : 'environment'; // 'environment' is the back camera
+  getCameraStream(facingMode);
+});
 
 // Handle image upload
 imageUpload.addEventListener('change', (event) => {
