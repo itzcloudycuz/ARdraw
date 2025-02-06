@@ -33,6 +33,11 @@ function getCameraStream(facingMode) {
       }
       currentStream = stream;
       video.srcObject = stream;
+
+      // Wait for the video metadata to load to get the correct aspect ratio
+      video.onloadedmetadata = () => {
+        resizeCanvas();
+      };
     })
     .catch((err) => {
       console.error('Error accessing the camera: ', err);
@@ -81,19 +86,38 @@ function drawOverlay() {
   // Draw uploaded image with opacity
   if (uploadedImage) {
     ctx.globalAlpha = opacity;
-    ctx.drawImage(uploadedImage, 0, 0, window.innerWidth, window.innerHeight;
+    ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 1.0; // Reset opacity
   }
 }
 
 // Resize canvas to match video feed
 function resizeCanvas() {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
+  const aspectRatio = video.videoWidth / video.videoHeight;
+
+  // Set canvas dimensions based on the aspect ratio
+  if (window.innerWidth / window.innerHeight > aspectRatio) {
+    // Window is wider than the camera feed
+    canvas.width = window.innerHeight * aspectRatio;
+    canvas.height = window.innerHeight;
+  } else {
+    // Window is taller than the camera feed
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerWidth / aspectRatio;
+  }
+
+  // Center the canvas
+  canvas.style.left = `${(window.innerWidth - canvas.width) / 2}px`;
+  canvas.style.top = `${(window.innerHeight - canvas.height) / 2}px`;
 }
 
 // Continuously update the canvas
 video.addEventListener('play', () => {
   resizeCanvas();
   setInterval(drawOverlay, 30); // Update overlay at 30fps
+});
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  resizeCanvas();
 });
