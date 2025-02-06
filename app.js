@@ -95,10 +95,22 @@ function drawOverlay() {
   }
 }
 
-// Resize canvas
+// Resize canvas based on video aspect ratio
 function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
+  const aspectRatio = video.videoWidth / video.videoHeight;
+  
+  if (window.innerWidth / window.innerHeight > aspectRatio) {
+    canvas.width = window.innerHeight * aspectRatio;
+    canvas.height = window.innerHeight;
+  } else {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerWidth / aspectRatio;
+  }
+
+  // Update the video feed size to match the canvas
+  video.width = canvas.width;
+  video.height = canvas.height;
+
   if (uploadedImage) {
     imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
   }
@@ -132,14 +144,15 @@ canvas.addEventListener("touchmove", (event) => {
     }
 
     // Skew handling: Track horizontal & vertical drag for skew adjustments
-    const skewX = (touch1.pageX + touch2.pageX) / 2;
-    const skewY = (touch1.pageY + touch2.pageY) / 2;
-    imgSkewX = (skewX - lastTouchX) / 100;
-    imgSkewY = (skewY - lastTouchY) / 100;
-    lastTouchX = skewX;
-    lastTouchY = skewY;
+    if (event.touches.length === 2) {
+      const skewX = (touch1.pageX + touch2.pageX) / 2;
+      const skewY = (touch1.pageY + touch2.pageY) / 2;
+      imgSkewX = (skewX - lastTouchX) / 100;
+      imgSkewY = (skewY - lastTouchY) / 100;
+      lastTouchX = skewX;
+      lastTouchY = skewY;
+    }
 
-    // Update the transformations
     lastDist = dist;
     lastAngle = angle;
 
@@ -165,4 +178,3 @@ video.addEventListener('play', () => {
   resizeCanvas();
   setInterval(drawOverlay, 30);
 });
-
