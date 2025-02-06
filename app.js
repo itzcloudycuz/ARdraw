@@ -59,7 +59,7 @@ imageUpload.addEventListener('change', (event) => {
       uploadedImage.onload = () => {
         imgX = canvas.width / 2;
         imgY = canvas.height / 2;
-        imgScale = 1;
+        imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
         imgRotation = 0;
         drawOverlay();
       };
@@ -93,6 +93,9 @@ function drawOverlay() {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+  if (uploadedImage) {
+    imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
+  }
   drawOverlay();
 }
 
@@ -125,6 +128,10 @@ canvas.addEventListener("touchmove", (event) => {
 
     lastDist = dist;
     lastAngle = angle;
+
+    // Ensure the image doesn't grow beyond the canvas size
+    imgScale = Math.min(imgScale, 3); // Limit max scale to 3 times the original size
+    imgScale = Math.max(imgScale, 0.1); // Limit min scale to 10% of the original size
 
     drawOverlay();
   }
