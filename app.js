@@ -10,7 +10,7 @@ let uploadedImage = null;
 let currentStream = null;
 let usingFrontCamera = true;
 
-// Detect mobile devices
+// Function to check if the device is mobile
 function isMobile() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
@@ -20,27 +20,37 @@ if (isMobile()) {
   switchCameraButton.style.display = 'block';
 }
 
+// Request camera permissions before starting
+navigator.permissions.query({ name: 'camera' }).then((permission) => {
+  if (permission.state === 'denied') {
+    alert('Please enable camera access in your browser settings.');
+  }
+});
+
 // Function to get camera stream
 function getCameraStream(facingMode) {
+  console.log("Attempting to access camera...");
   const constraints = {
-    video: { facingMode: facingMode }
+    video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
   };
 
   navigator.mediaDevices.getUserMedia(constraints)
     .then((stream) => {
+      console.log("Camera stream received:", stream);
       if (currentStream) {
         currentStream.getTracks().forEach(track => track.stop()); // Stop the previous stream
       }
       currentStream = stream;
       video.srcObject = stream;
 
-      // Wait for the video metadata to load to get the correct aspect ratio
       video.onloadedmetadata = () => {
+        video.play();  // Ensure video starts playing
         resizeCanvas();
       };
     })
     .catch((err) => {
-      console.error('Error accessing the camera: ', err);
+      console.error('Error accessing the camera:', err);
+      alert("Camera access is blocked. Please allow it in browser settings.");
     });
 }
 
@@ -77,6 +87,11 @@ opacitySlider.addEventListener('input', () => {
 
 // Draw the overlay
 function drawOverlay() {
+  if (!video.videoWidth || !video.videoHeight) {
+    console.warn("Video metadata not loaded yet.");
+    return;
+  }
+
   const opacity = parseFloat(opacitySlider.value);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -93,6 +108,11 @@ function drawOverlay() {
 
 // Resize canvas to match video feed
 function resizeCanvas() {
+  if (!video.videoWidth || !video.videoHeight) {
+    console.warn("Video metadata not loaded yet.");
+    return;
+  }
+
   const aspectRatio = video.videoWidth / video.videoHeight;
 
   // Set canvas dimensions based on the aspect ratio
