@@ -132,15 +132,14 @@ canvas.addEventListener("touchmove", (event) => {
     }
 
     // Skew handling: Track horizontal & vertical drag for skew adjustments
-    if (event.touches.length === 2) {
-      const skewX = (touch1.pageX + touch2.pageX) / 2;
-      const skewY = (touch1.pageY + touch2.pageY) / 2;
-      imgSkewX = (skewX - lastTouchX) / 100;
-      imgSkewY = (skewY - lastTouchY) / 100;
-      lastTouchX = skewX;
-      lastTouchY = skewY;
-    }
+    const skewX = (touch1.pageX + touch2.pageX) / 2;
+    const skewY = (touch1.pageY + touch2.pageY) / 2;
+    imgSkewX = (skewX - lastTouchX) / 100;
+    imgSkewY = (skewY - lastTouchY) / 100;
+    lastTouchX = skewX;
+    lastTouchY = skewY;
 
+    // Update the transformations
     lastDist = dist;
     lastAngle = angle;
 
@@ -166,3 +165,4 @@ video.addEventListener('play', () => {
   resizeCanvas();
   setInterval(drawOverlay, 30);
 });
+
