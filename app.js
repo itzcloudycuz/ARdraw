@@ -12,6 +12,7 @@ let usingFrontCamera = true;
 
 // Transformation properties
 let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0, imgSkewX = 0, imgSkewY = 0;
+let lastDist = 0, lastAngle = 0, lastTouchX = 0, lastTouchY = 0;
 
 // Detect mobile devices
 function isMobile() {
@@ -106,9 +107,18 @@ function resizeCanvas() {
 }
 
 // Touch Gesture Handling (Pinch, Rotate & Skew)
-let lastDist = 0;
-let lastAngle = 0;
-let lastTouchX = 0, lastTouchY = 0;
+canvas.addEventListener("touchstart", (event) => {
+  if (event.touches.length === 2) {
+    event.preventDefault();
+    // Store initial touch positions
+    const touch1 = event.touches[0];
+    const touch2 = event.touches[1];
+    lastDist = getDistance(touch1, touch2);
+    lastAngle = getAngle(touch1, touch2);
+    lastTouchX = (touch1.pageX + touch2.pageX) / 2;
+    lastTouchY = (touch1.pageY + touch2.pageY) / 2;
+  }
+});
 
 canvas.addEventListener("touchmove", (event) => {
   if (event.touches.length === 2) {
@@ -117,21 +127,21 @@ canvas.addEventListener("touchmove", (event) => {
     const touch1 = event.touches[0];
     const touch2 = event.touches[1];
 
-    // Calculate distance and angle
-    const dx = touch2.pageX - touch1.pageX;
-    const dy = touch2.pageY - touch1.pageY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    const angle = Math.atan2(dy, dx);
+    // Calculate new distance and angle
+    const dist = getDistance(touch1, touch2);
+    const angle = getAngle(touch1, touch2);
 
+    // Pinch-to-zoom scaling
     if (lastDist > 0) {
-      imgScale *= dist / lastDist; // Scale the image
+      imgScale *= dist / lastDist;
     }
 
+    // Rotate the image
     if (lastAngle !== 0) {
-      imgRotation += angle - lastAngle; // Rotate the image
+      imgRotation += angle - lastAngle;
     }
 
-    // Skew handling: Track horizontal & vertical drag for skew adjustments
+    // Skew handling (calculate skew based on touch movement)
     if (event.touches.length === 2) {
       const skewX = (touch1.pageX + touch2.pageX) / 2;
       const skewY = (touch1.pageY + touch2.pageY) / 2;
@@ -141,24 +151,37 @@ canvas.addEventListener("touchmove", (event) => {
       lastTouchY = skewY;
     }
 
+    // Update the previous distance and angle
     lastDist = dist;
     lastAngle = angle;
 
-    // Ensure image scale is within reasonable limits
-    imgScale = Math.min(imgScale, 3); // Max scale 3x
-    imgScale = Math.max(imgScale, 0.1); // Min scale 0.1x
+    // Apply limits to image scale
+    imgScale = Math.max(0.1, Math.min(imgScale, 3)); // Scale between 0.1x and 3x
 
     drawOverlay();
   }
 });
 
-// Reset touch variables
 canvas.addEventListener("touchend", () => {
   lastDist = 0;
   lastAngle = 0;
   lastTouchX = 0;
   lastTouchY = 0;
 });
+
+// Utility function to calculate the distance between two touch points
+function getDistance(touch1, touch2) {
+  const dx = touch2.pageX - touch1.pageX;
+  const dy = touch2.pageY - touch1.pageY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// Utility function to calculate the angle between two touch points
+function getAngle(touch1, touch2) {
+  const dx = touch2.pageX - touch1.pageX;
+  const dy = touch2.pageY - touch1.pageY;
+  return Math.atan2(dy, dx);
+}
 
 // Keep canvas size updated
 window.addEventListener('resize', resizeCanvas);
