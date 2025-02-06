@@ -38,6 +38,11 @@
       background: rgba(255, 255, 255, 0.8);
       padding: 10px;
       border-radius: 10px;
+      display: flex;
+      gap: 10px;
+    }
+    #switch-camera {
+      display: none; /* Hidden by default */
     }
   </style>
 </head>
@@ -47,6 +52,7 @@
   <div id="controls">
     <input type="file" id="image-upload" accept="image/*" />
     <input type="range" id="opacity-slider" min="0" max="1" step="0.1" value="0.5" />
+    <button id="switch-camera">Switch Camera</button>
   </div>
   <script src="./app.js"></script>
 </body>
