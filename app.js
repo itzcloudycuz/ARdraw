@@ -81,7 +81,7 @@ function drawOverlay() {
   // Draw uploaded image with opacity
   if (uploadedImage) {
     ctx.globalAlpha = opacity;
-    ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(uploadedImage, 0, 0, window.innerWidth, window.innerHeight;
     ctx.globalAlpha = 1.0; // Reset opacity
   }
 }
