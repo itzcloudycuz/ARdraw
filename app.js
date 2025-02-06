@@ -10,7 +10,10 @@ let uploadedImage = null;
 let currentStream = null;
 let usingFrontCamera = true;
 
-// Function to check if the device is mobile
+// Transformation properties
+let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0;
+
+// Detect mobile devices
 function isMobile() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
@@ -20,48 +23,29 @@ if (isMobile()) {
   switchCameraButton.style.display = 'block';
 }
 
-// Request camera permissions before starting
-navigator.permissions.query({ name: 'camera' }).then((permission) => {
-  if (permission.state === 'denied') {
-    alert('Please enable camera access in your browser settings.');
-  }
-});
-
 // Function to get camera stream
 function getCameraStream(facingMode) {
-  console.log("Attempting to access camera...");
-  const constraints = {
-    video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
-  };
+  const constraints = { video: { facingMode: facingMode } };
 
   navigator.mediaDevices.getUserMedia(constraints)
     .then((stream) => {
-      console.log("Camera stream received:", stream);
       if (currentStream) {
-        currentStream.getTracks().forEach(track => track.stop()); // Stop the previous stream
+        currentStream.getTracks().forEach(track => track.stop());
       }
       currentStream = stream;
       video.srcObject = stream;
-
-      video.onloadedmetadata = () => {
-        video.play();  // Ensure video starts playing
-        resizeCanvas();
-      };
+      video.onloadedmetadata = resizeCanvas;
     })
-    .catch((err) => {
-      console.error('Error accessing the camera:', err);
-      alert("Camera access is blocked. Please allow it in browser settings.");
-    });
+    .catch(err => console.error('Error accessing the camera:', err));
 }
 
 // Initialize with front camera
-getCameraStream('user'); // 'user' is the front camera
+getCameraStream('user');
 
 // Switch cameras
 switchCameraButton.addEventListener('click', () => {
   usingFrontCamera = !usingFrontCamera;
-  const facingMode = usingFrontCamera ? 'user' : 'environment'; // 'environment' is the back camera
-  getCameraStream(facingMode);
+  getCameraStream(usingFrontCamera ? 'user' : 'environment');
 });
 
 // Handle image upload
@@ -73,6 +57,10 @@ imageUpload.addEventListener('change', (event) => {
       uploadedImage = new Image();
       uploadedImage.src = e.target.result;
       uploadedImage.onload = () => {
+        imgX = canvas.width / 2;
+        imgY = canvas.height / 2;
+        imgScale = 1;
+        imgRotation = 0;
         drawOverlay();
       };
     };
@@ -81,63 +69,76 @@ imageUpload.addEventListener('change', (event) => {
 });
 
 // Handle opacity change
-opacitySlider.addEventListener('input', () => {
-  drawOverlay();
-});
+opacitySlider.addEventListener('input', drawOverlay);
 
 // Draw the overlay
 function drawOverlay() {
-  if (!video.videoWidth || !video.videoHeight) {
-    console.warn("Video metadata not loaded yet.");
-    return;
-  }
-
   const opacity = parseFloat(opacitySlider.value);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Draw camera feed
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  // Draw uploaded image with opacity
   if (uploadedImage) {
     ctx.globalAlpha = opacity;
-    ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
-    ctx.globalAlpha = 1.0; // Reset opacity
+    ctx.save();
+    ctx.translate(imgX, imgY);
+    ctx.rotate(imgRotation);
+    ctx.scale(imgScale, imgScale);
+    ctx.drawImage(uploadedImage, -uploadedImage.width / 2, -uploadedImage.height / 2);
+    ctx.restore();
+    ctx.globalAlpha = 1.0;
   }
 }
 
-// Resize canvas to match video feed
+// Resize canvas
 function resizeCanvas() {
-  if (!video.videoWidth || !video.videoHeight) {
-    console.warn("Video metadata not loaded yet.");
-    return;
-  }
-
-  const aspectRatio = video.videoWidth / video.videoHeight;
-
-  // Set canvas dimensions based on the aspect ratio
-  if (window.innerWidth / window.innerHeight > aspectRatio) {
-    // Window is wider than the camera feed
-    canvas.width = window.innerHeight * aspectRatio;
-    canvas.height = window.innerHeight;
-  } else {
-    // Window is taller than the camera feed
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerWidth / aspectRatio;
-  }
-
-  // Center the canvas
-  canvas.style.left = `${(window.innerWidth - canvas.width) / 2}px`;
-  canvas.style.top = `${(window.innerHeight - canvas.height) / 2}px`;
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  drawOverlay();
 }
 
-// Continuously update the canvas
-video.addEventListener('play', () => {
-  resizeCanvas();
-  setInterval(drawOverlay, 30); // Update overlay at 30fps
+// Touch Gesture Handling (Pinch & Rotate)
+let lastDist = 0;
+let lastAngle = 0;
+
+canvas.addEventListener("touchmove", (event) => {
+  if (event.touches.length === 2) {
+    event.preventDefault();
+    
+    const touch1 = event.touches[0];
+    const touch2 = event.touches[1];
+
+    // Calculate distance
+    const dx = touch2.pageX - touch1.pageX;
+    const dy = touch2.pageY - touch1.pageY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Calculate angle
+    const angle = Math.atan2(dy, dx);
+
+    if (lastDist > 0) {
+      imgScale *= dist / lastDist; // Scale the image
+    }
+
+    if (lastAngle !== 0) {
+      imgRotation += angle - lastAngle; // Rotate the image
+    }
+
+    lastDist = dist;
+    lastAngle = angle;
+
+    drawOverlay();
+  }
 });
 
-// Handle window resize
-window.addEventListener('resize', () => {
+// Reset last distance & angle when fingers are lifted
+canvas.addEventListener("touchend", () => {
+  lastDist = 0;
+  lastAngle = 0;
+});
+
+// Keep canvas size updated
+window.addEventListener('resize', resizeCanvas);
+video.addEventListener('play', () => {
   resizeCanvas();
+  setInterval(drawOverlay, 30);
 });
