@@ -4,25 +4,12 @@ const canvas = document.getElementById('overlay');
 const ctx = canvas.getContext('2d');
 const imageUpload = document.getElementById('image-upload');
 const opacitySlider = document.getElementById('opacity-slider');
-const switchCameraButton = document.getElementById('switch-camera');
+const scaleSlider = document.getElementById('scale-slider');
 
 let uploadedImage = null;
 let currentStream = null;
-let usingFrontCamera = true;
-
-// Transformation properties
 let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0, imgSkewX = 0, imgSkewY = 0;
 let lastDist = 0, lastAngle = 0, lastTouchX = 0, lastTouchY = 0;
-
-// Detect mobile devices
-function isMobile() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-}
-
-// Show switch camera button only on mobile devices
-if (isMobile()) {
-  switchCameraButton.style.display = 'block';
-}
 
 // Function to get camera stream
 function getCameraStream(facingMode) {
@@ -43,12 +30,6 @@ function getCameraStream(facingMode) {
 // Initialize with front camera
 getCameraStream('user');
 
-// Switch cameras
-switchCameraButton.addEventListener('click', () => {
-  usingFrontCamera = !usingFrontCamera;
-  getCameraStream(usingFrontCamera ? 'user' : 'environment');
-});
-
 // Handle image upload
 imageUpload.addEventListener('change', (event) => {
   const file = event.target.files[0];
@@ -60,10 +41,7 @@ imageUpload.addEventListener('change', (event) => {
       uploadedImage.onload = () => {
         imgX = canvas.width / 2;
         imgY = canvas.height / 2;
-        imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
-        imgRotation = 0;
-        imgSkewX = 0;
-        imgSkewY = 0;
+        imgScale = 1; // Reset scale on new image
         drawOverlay();
       };
     };
@@ -73,6 +51,12 @@ imageUpload.addEventListener('change', (event) => {
 
 // Handle opacity change
 opacitySlider.addEventListener('input', drawOverlay);
+
+// Handle scale change
+scaleSlider.addEventListener('input', (event) => {
+  imgScale = parseFloat(event.target.value);
+  drawOverlay();
+});
 
 // Draw the overlay
 function drawOverlay() {
@@ -100,17 +84,13 @@ function drawOverlay() {
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
-  if (uploadedImage) {
-    imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
-  }
   drawOverlay();
 }
 
-// Touch Gesture Handling (Pinch, Rotate & Skew)
+// Handle touch gestures (for now just scaling)
 canvas.addEventListener("touchstart", (event) => {
   if (event.touches.length === 2) {
     event.preventDefault();
-    // Store initial touch positions
     const touch1 = event.touches[0];
     const touch2 = event.touches[1];
     lastDist = getDistance(touch1, touch2);
@@ -123,7 +103,6 @@ canvas.addEventListener("touchstart", (event) => {
 canvas.addEventListener("touchmove", (event) => {
   if (event.touches.length === 2) {
     event.preventDefault();
-    
     const touch1 = event.touches[0];
     const touch2 = event.touches[1];
 
@@ -132,31 +111,14 @@ canvas.addEventListener("touchmove", (event) => {
     const angle = getAngle(touch1, touch2);
 
     // Pinch-to-zoom scaling
-    if (lastDist > 0) {
-      imgScale *= dist / lastDist;
-    }
+    imgScale *= dist / lastDist;
+    imgScale = Math.max(0.1, Math.min(imgScale, 3)); // Limit scale
 
     // Rotate the image
-    if (lastAngle !== 0) {
-      imgRotation += angle - lastAngle;
-    }
+    imgRotation += angle - lastAngle;
 
-    // Skew handling (calculate skew based on touch movement)
-    if (event.touches.length === 2) {
-      const skewX = (touch1.pageX + touch2.pageX) / 2;
-      const skewY = (touch1.pageY + touch2.pageY) / 2;
-      imgSkewX = (skewX - lastTouchX) / 100;
-      imgSkewY = (skewY - lastTouchY) / 100;
-      lastTouchX = skewX;
-      lastTouchY = skewY;
-    }
-
-    // Update the previous distance and angle
     lastDist = dist;
     lastAngle = angle;
-
-    // Apply limits to image scale
-    imgScale = Math.max(0.1, Math.min(imgScale, 3)); // Scale between 0.1x and 3x
 
     drawOverlay();
   }
