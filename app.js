@@ -9,9 +9,17 @@ const switchCameraButton = document.getElementById('switch-camera');
 let uploadedImage = null;
 let currentStream = null;
 let usingFrontCamera = true;
+let isAnimating = true;
 
 // Transformation properties
 let imgX = 0, imgY = 0, imgScale = 1, imgRotation = 0, imgSkewX = 0, imgSkewY = 0;
+let isDragging = false;
+
+// Touch tracking variables
+let lastDist = 0;
+let lastAngle = 0;
+let lastTouchX = 0, lastTouchY = 0;
+let initialTouchX = 0, initialTouchY = 0;
 
 // Detect mobile devices
 function isMobile() {
@@ -25,7 +33,13 @@ if (isMobile()) {
 
 // Function to get camera stream
 function getCameraStream(facingMode) {
-  const constraints = { video: { facingMode: facingMode } };
+  const constraints = { 
+    video: { 
+      facingMode: facingMode,
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    } 
+  };
 
   navigator.mediaDevices.getUserMedia(constraints)
     .then((stream) => {
@@ -57,13 +71,17 @@ imageUpload.addEventListener('change', (event) => {
       uploadedImage = new Image();
       uploadedImage.src = e.target.result;
       uploadedImage.onload = () => {
+        // Center the image initially
         imgX = canvas.width / 2;
         imgY = canvas.height / 2;
-        imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
+        // Scale image to fit nicely on screen
+        imgScale = Math.min(
+          (canvas.width * 0.8) / uploadedImage.width, 
+          (canvas.height * 0.8) / uploadedImage.height
+        );
         imgRotation = 0;
         imgSkewX = 0;
         imgSkewY = 0;
-        drawOverlay();
       };
     };
     reader.readAsDataURL(file);
@@ -71,110 +89,165 @@ imageUpload.addEventListener('change', (event) => {
 });
 
 // Handle opacity change
-opacitySlider.addEventListener('input', drawOverlay);
+opacitySlider.addEventListener('input', () => {
+  // No need to call drawOverlay directly as it's handled by animation frame
+});
 
-// Draw the overlay
+// Improved draw overlay function with better performance
 function drawOverlay() {
-  const opacity = parseFloat(opacitySlider.value);
+  if (!ctx || !canvas) return;
+
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  
+  // Only draw the video if it's playing and ready
+  if (video.readyState === video.HAVE_ENOUGH_DATA) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  }
 
   if (uploadedImage) {
-    ctx.globalAlpha = opacity;
+    ctx.globalAlpha = parseFloat(opacitySlider.value);
     ctx.save();
     
-    // Apply transformations (scale, rotate, skew)
-    ctx.translate(imgX, imgY);
+    // Apply transformations with improved precision
+    ctx.translate(Math.round(imgX), Math.round(imgY));
     ctx.rotate(imgRotation);
     ctx.scale(imgScale, imgScale);
-    ctx.transform(1, imgSkewY, imgSkewX, 1, 0, 0);  // Apply skew
+    ctx.transform(1, imgSkewY, imgSkewX, 1, 0, 0);
     
-    ctx.drawImage(uploadedImage, -uploadedImage.width / 2, -uploadedImage.height / 2);
+    ctx.drawImage(
+      uploadedImage, 
+      -Math.round(uploadedImage.width / 2), 
+      -Math.round(uploadedImage.height / 2)
+    );
+    
     ctx.restore();
     ctx.globalAlpha = 1.0;
   }
+
+  if (isAnimating) {
+    requestAnimationFrame(drawOverlay);
+  }
 }
 
-// Resize canvas based on video aspect ratio
+// Improved resize function with better aspect ratio handling
 function resizeCanvas() {
   const aspectRatio = video.videoWidth / video.videoHeight;
   
   if (window.innerWidth / window.innerHeight > aspectRatio) {
-    canvas.width = window.innerHeight * aspectRatio;
     canvas.height = window.innerHeight;
+    canvas.width = window.innerHeight * aspectRatio;
   } else {
     canvas.width = window.innerWidth;
     canvas.height = window.innerWidth / aspectRatio;
   }
 
-  // Update the video feed size to match the canvas
-  video.width = canvas.width;
-  video.height = canvas.height;
-
+  // Ensure uploaded image maintains relative position after resize
   if (uploadedImage) {
-    imgScale = Math.min(canvas.width / uploadedImage.width, canvas.height / uploadedImage.height);
+    imgX = (imgX / canvas.width) * canvas.width;
+    imgY = (imgY / canvas.height) * canvas.height;
+    imgScale = Math.min(
+      (canvas.width * 0.8) / uploadedImage.width,
+      (canvas.height * 0.8) / uploadedImage.height
+    );
   }
-  drawOverlay();
 }
 
-// Touch Gesture Handling (Pinch, Rotate & Skew)
-let lastDist = 0;
-let lastAngle = 0;
-let lastTouchX = 0, lastTouchY = 0;
+// Improved touch handling
+canvas.addEventListener("touchstart", (event) => {
+  event.preventDefault();
+  const touch = event.touches[0];
+  initialTouchX = touch.pageX;
+  initialTouchY = touch.pageY;
+  
+  if (event.touches.length === 1) {
+    isDragging = true;
+    lastTouchX = touch.pageX;
+    lastTouchY = touch.pageY;
+  }
+});
 
 canvas.addEventListener("touchmove", (event) => {
-  if (event.touches.length === 2) {
-    event.preventDefault();
+  event.preventDefault();
+  
+  if (event.touches.length === 1 && isDragging) {
+    // Single touch drag to move image
+    const touch = event.touches[0];
+    const deltaX = touch.pageX - lastTouchX;
+    const deltaY = touch.pageY - lastTouchY;
     
+    imgX += deltaX;
+    imgY += deltaY;
+    
+    lastTouchX = touch.pageX;
+    lastTouchY = touch.pageY;
+  } else if (event.touches.length === 2) {
+    // Two finger gesture for scale, rotate, and skew
     const touch1 = event.touches[0];
     const touch2 = event.touches[1];
 
-    // Calculate distance and angle
+    // Calculate distance and angle for scaling and rotation
     const dx = touch2.pageX - touch1.pageX;
     const dy = touch2.pageY - touch1.pageY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
 
     if (lastDist > 0) {
-      imgScale *= dist / lastDist; // Scale the image
+      // Smooth scaling
+      const scaleDelta = (dist - lastDist) / lastDist;
+      imgScale = Math.max(0.1, Math.min(3, imgScale * (1 + scaleDelta)));
     }
 
     if (lastAngle !== 0) {
-      imgRotation += angle - lastAngle; // Rotate the image
+      // Smooth rotation
+      imgRotation += angle - lastAngle;
     }
 
-    // Skew handling: Track horizontal & vertical drag for skew adjustments
-    if (event.touches.length === 2) {
-      const skewX = (touch1.pageX + touch2.pageX) / 2;
-      const skewY = (touch1.pageY + touch2.pageY) / 2;
-      imgSkewX = (skewX - lastTouchX) / 100;
-      imgSkewY = (skewY - lastTouchY) / 100;
-      lastTouchX = skewX;
-      lastTouchY = skewY;
+    // Improved skew handling
+    const centerX = (touch1.pageX + touch2.pageX) / 2;
+    const centerY = (touch1.pageY + touch2.pageY) / 2;
+    
+    if (lastTouchX !== 0 && lastTouchY !== 0) {
+      const skewDeltaX = (centerX - lastTouchX) / canvas.width;
+      const skewDeltaY = (centerY - lastTouchY) / canvas.height;
+      
+      imgSkewX = Math.max(-0.5, Math.min(0.5, imgSkewX + skewDeltaX));
+      imgSkewY = Math.max(-0.5, Math.min(0.5, imgSkewY + skewDeltaY));
     }
 
     lastDist = dist;
     lastAngle = angle;
-
-    // Ensure image scale is within reasonable limits
-    imgScale = Math.min(imgScale, 3); // Max scale 3x
-    imgScale = Math.max(imgScale, 0.1); // Min scale 0.1x
-
-    drawOverlay();
+    lastTouchX = centerX;
+    lastTouchY = centerY;
   }
 });
 
-// Reset touch variables
 canvas.addEventListener("touchend", () => {
+  isDragging = false;
   lastDist = 0;
   lastAngle = 0;
   lastTouchX = 0;
   lastTouchY = 0;
 });
 
-// Keep canvas size updated
-window.addEventListener('resize', resizeCanvas);
+// Improved window resize handling
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  // Debounce resize events
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(resizeCanvas, 250);
+});
+
+// Start the animation loop when video is ready
 video.addEventListener('play', () => {
   resizeCanvas();
-  setInterval(drawOverlay, 30);
+  isAnimating = true;
+  requestAnimationFrame(drawOverlay);
+});
+
+// Clean up when page is hidden/visible
+document.addEventListener('visibilitychange', () => {
+  isAnimating = !document.hidden;
+  if (isAnimating) {
+    requestAnimationFrame(drawOverlay);
+  }
 });
